@@ -1,0 +1,99 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 <channel_num | network_name | callsign>"
+    exit 1
+fi
+
+# could use a better channel mapping
+
+shopt -s nocasematch
+case "$1" in
+    "4" | "ABC" | "KOMO" | "KOMO4" | "KOMO-4" )
+        echo "Tuning ABC"
+        CHANNEL=18
+        PROGRAM=4
+        ;;
+    "5" | "NBC" | "King" | "King5" | "King-5" )
+        echo "Tuning NBC"
+        CHANNEL=15
+        PROGRAM=2
+        ;;
+    "7" | "CBS" | "KIRO" | "Kiro7" | "Kiro-7" )
+        echo "Tuning CBS"
+        CHANNEL=110
+        PROGRAM=2
+        ;;
+    "13" | "FOX" )
+        echo "Tuning FOX"
+        CHANNEL=111
+        PROGRAM=1
+        ;;
+    "9" | "PBS" | "KCTS" )
+        echo "Tuning PBS"
+        CHANNEL=18
+        PROGRAM=1
+        ;;
+    "11" | "CW" )
+        echo "Tuning The CW"
+        CHANNEL=111
+        PROGRAM=2
+        ;;
+    "KONG" )
+        echo "Tuning KONG"
+        CHANNEL=110
+        PROGRAM=1
+        ;;
+    "Discovery" | "disc" )
+        echo "Tuning Discovery"
+        CHANNEL=36
+        PROGRAM=2203
+        ;;
+    "CBC" | "CBUT" )
+        echo "Tuning CBC"
+        CHANNEL=60
+        PROGRAM=2
+        ;;
+    *)
+        echo "Unknown station $1"
+        if [ -z "$2" ]; then
+            echo "advanced usage: $0 channel_num program_id"
+            exit 1
+        fi
+        echo "trying Channel $1 Program $2"
+        CHANNEL=$1
+        PROGRAM=$2
+        ;;
+esac
+
+# device id of homerun
+DEVICE=`hdhomerun_config discover | awk '{print $3}'`
+
+# this computer's ip address I want the Homerun to connect to
+MY_IP=`ifconfig en0 | grep inet | grep -v inet6 | awk '{print $2}'`
+if [ -z "$MY_IP" ]; then
+    MY_IP=`ifconfig en1 | grep inet | grep -v inet6 | awk '{print $2}'`
+fi
+
+# arbitrary port for VLC to listen on
+RTP_PORT=5000
+
+# tuner id
+TUNER=0
+
+# won't work if VLC is already running
+killall -9 VLC > /dev/null 2>&1
+sleep 1
+
+# start VLC listening for stream
+open /Applications/VLC.app --args rtp://@:$RTP_PORT
+sleep 2
+
+# set the tuner channel
+hdhomerun_config $DEVICE set /tuner$TUNER/channel auto:$CHANNEL
+
+# set the program id
+hdhomerun_config $DEVICE set /tuner$TUNER/program $PROGRAM
+
+# tell it to send the video stream our way
+hdhomerun_config $DEVICE set /tuner$TUNER/target rtp://$MY_IP:$RTP_PORT
